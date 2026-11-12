@@ -845,11 +845,11 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
         } else if (flags.lockedDoor) showSubtitle("Дверь заперта. Стук прекратился."); else showSubtitle("Обычная дверь. Пока что."); break;
       case 'busstop': if (gameState === STATE.ESCAPE) { gameState = STATE.FOREST; buildForest(); showSubtitle("Ты добираешься до остановки. Но чувствуешь слабость... Ты спускаешься в канаву и теряешь сознание."); currentObjective = "Дойти до остановки в лесу"; updateHUD(); } break;
       case 'escape': if (gameState === STATE.FOREST) triggerEnding(); break;
-      case 'escapeTrench': flags.wentIntoTrench = true; gameState = STATE.ESCAPE; document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
+      case 'escapeTrench': flags.wentIntoTrench = true; gameState = STATE.ESCAPE; document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); setTimeout(() => { camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); }, 500); camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
       camera.position.set(10, 1.65, 10);
       camera.rotation.y = Math.PI * 0.25;
       camera.rotation.x = 0;
-      renderer.render(scene, camera); document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity();
+      renderer.render(scene, camera); document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); setTimeout(() => { camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); }, 500);
       setTimeout(() => { renderer.render(scene, camera); }, 100); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
     }
   };
