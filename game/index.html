@@ -870,6 +870,9 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     document.getElementById('fade').style.opacity = '1';
     setTimeout(() => {
       document.getElementById('act1-ui').style.display = 'none';
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('subtitle').style.display = 'none';
+      document.getElementById('minimap-container').style.display = 'none';
       document.getElementById('c-act1').style.display = 'none';
       document.getElementById('fade').style.opacity = '0';
       act1Active = false;
@@ -1007,6 +1010,9 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
 // ============================================================
 function startAct2() {
   document.getElementById('act1-ui').style.display = 'none';
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('subtitle').style.display = 'none';
+      document.getElementById('minimap-container').style.display = 'none';
   document.getElementById('c-act1').style.display = 'none';
   document.getElementById('mobileControls').style.display = 'block';
   
