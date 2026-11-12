@@ -14,6 +14,9 @@
   #flash { position: absolute; inset: 0; pointer-events: none; background: #f00; opacity: 0; z-index: 6; transition: opacity 0.12s; mix-blend-mode: screen; }
   #fade { position: absolute; inset: 0; pointer-events: none; background: #000; opacity: 0; z-index: 50; transition: opacity 2s; }
 
+  /* Скрываем виньетку и шум на мобильных */
+  body.mobile #vignette, body.mobile #grain { display: none !important; }
+
   #hud { position: absolute; top: 12px; left: 12px; right: 12px; pointer-events: none; display: flex; flex-direction: column; gap: 6px; text-shadow: 0 1px 4px #000, 0 0 8px #000; font-size: 14px; z-index: 10; }
   #subtitle { position: absolute; top: 65%; left: 50%; transform: translateX(-50%); width: 82%; max-width: 760px; text-align: center; background: linear-gradient(180deg, rgba(0,0,0,0.82), rgba(10,0,0,0.9)); padding: 14px 22px; border-radius: 3px; border-left: 3px solid #b00; border-right: 3px solid #b00; font-size: 15px; line-height: 1.5; pointer-events: none; transition: opacity 0.5s; z-index: 10; box-shadow: 0 0 30px rgba(120,0,0,0.3); }
   #crosshair-act1 { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border: 1px solid rgba(220,220,220,0.5); border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none; z-index: 5; transition: all 0.15s; }
@@ -67,6 +70,11 @@
   #end-screen h1 { color: #a00; font-size: 52px; letter-spacing: 8px; text-shadow: 0 0 40px #500; margin-bottom: 24px; }
   #end-screen p { color: #777; max-width: 640px; line-height: 1.8; font-size: 16px; }
 
+  #videoOverlay { display: none; position: absolute; inset: 0; z-index: 30; background: #000; align-items: center; justify-content: center; flex-direction: column; }
+  #newsVideo { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #skipVideoBtn { position: absolute; bottom: 30px; right: 30px; background: rgba(20,0,0,0.8); color: #ccc; border: 1px solid #555; padding: 10px 24px; font-family: 'Courier New',monospace; font-size: 14px; letter-spacing: 3px; cursor: pointer; z-index: 31; }
+  #skipVideoBtn:hover { background: #a00; color: #fff; border-color: #a00; }
+
   #mobileControls { display: none; position: absolute; inset: 0; z-index: 25; pointer-events: none; }
   body.mobile #mobileControls { display: block !important; }
   
@@ -96,12 +104,13 @@
 <audio id="cassetteAudio2" src="instructions_2.wav" preload="auto"></audio>
 <audio id="cassetteAudio3" src="instructions_3.wav" preload="auto"></audio>
 
-<!-- ================= АКТ 1 (THREE.JS) ================= -->
 <canvas id="c-act1" style="position:absolute; inset:0;"></canvas>
 <div id="vignette"></div>
 <div id="grain"></div>
 <div id="flash"></div>
 <div id="fade"></div>
+
+<div id="version-marker" style="position:fixed; bottom:5px; left:5px; z-index:9999; color:#fff; font-size:10px; opacity:0.5; font-family:monospace;">v14</div>
 
 <div id="act1-ui" style="position:absolute; inset:0; pointer-events:none;">
   <div id="crosshair-act1"></div>
@@ -132,7 +141,12 @@
   <button id="start-btn">НАЧАТЬ ИГРУ</button>
 </div>
 
-<!-- ================= АКТ 2 (CANVAS RAYCASTER) ================= -->
+<!-- ВИДЕО ДЛЯ ТЕЛЕВИЗОРА -->
+<div id="videoOverlay">
+  <video id="newsVideo" playsinline></video>
+  <button id="skipVideoBtn">ПРОПУСТИТЬ >></button>
+</div>
+
 <canvas id="c-act2" style="position:absolute; inset:0; display:none;"></canvas>
 
 <div id="act2-ui">
@@ -329,7 +343,7 @@ window.addEventListener('touchstart', (e) => {
   if (lookTouchId !== null) return;
   for (let i = 0; i < e.changedTouches.length; i++) {
     const touch = e.changedTouches[i];
-    if (touch.target.closest('.dpad') || touch.target.closest('.action-btns') || touch.target.closest('button') || touch.target.closest('#start-screen') || touch.target.closest('#cassettePlayer') || touch.target.closest('#keypadUI')) continue;
+    if (touch.target.closest('.dpad') || touch.target.closest('.action-btns') || touch.target.closest('button') || touch.target.closest('#start-screen') || touch.target.closest('#cassettePlayer') || touch.target.closest('#keypadUI') || touch.target.closest('#videoOverlay')) continue;
     
     if (touch.clientX > window.innerWidth / 2) {
       lookTouchId = touch.identifier;
@@ -373,13 +387,31 @@ const startHandler = (e) => {
 startBtn.addEventListener('click', startHandler);
 startBtn.addEventListener('touchstart', startHandler, {passive: false});
 
+// ВИДЕО
+window._videoOverlay = document.getElementById('videoOverlay');
+window._newsVideo = document.getElementById('newsVideo');
+window._skipVideoBtn = document.getElementById('skipVideoBtn');
+window._newsVideo.src = 'news.mp4';
+
+window._skipVideoBtn.addEventListener('click', () => {
+  window._newsVideo.pause();
+  window._newsVideo.currentTime = 0;
+  window._videoOverlay.style.display = 'none';
+  if (window.onVideoEnd) window.onVideoEnd();
+});
+
+window._newsVideo.addEventListener('ended', () => {
+  window._videoOverlay.style.display = 'none';
+  if (window.onVideoEnd) window.onVideoEnd();
+});
+
 
 // ============================================================
 //  КОД АКТА 1 (THREE.JS)
 // ============================================================
 (function(){
   const canvas = document.getElementById('c-act1');
-  const STATE = { MENU:0, APARTMENT:1, ESCAPE:2, FOREST:3, ENDING:4 };
+  const STATE = { MENU:0, APARTMENT:1, ESCAPE:2, FOREST:3, ENDING:4, TV:5 };
   let gameState = STATE.MENU;
   let currentObjective = "Осмотреться в квартире";
   let health = 100;
@@ -416,7 +448,7 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !isMobile;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -537,7 +569,6 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     const c = makeCanvas(256), ctx = c.getContext('2d');
     ctx.clearRect(0,0,256,256);
     
-    // Рваная форма
     ctx.fillStyle = '#000000';
     ctx.beginPath();
     ctx.moveTo(128, 10);
@@ -550,7 +581,6 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     ctx.closePath();
     ctx.fill();
 
-    // Красные светящиеся прожилки
     for (let i = 0; i < 30; i++) {
       ctx.strokeStyle = `rgba(180, 0, 0, ${0.3 + Math.random()*0.7})`;
       ctx.lineWidth = 1 + Math.random()*2;
@@ -603,7 +633,7 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
 
   const ambient = new THREE.AmbientLight(0x606070, 0.6); scene.add(ambient);
   const hemi = new THREE.HemisphereLight(0x8a8a9a, 0x2a2018, 0.6); scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xaab0c0, 0.5); dir.position.set(40, 70, 25); dir.castShadow = true; dir.shadow.mapSize.set(2048, 2048); dir.shadow.camera.near = 1; dir.shadow.camera.far = 250; dir.shadow.camera.left = -80; dir.shadow.camera.right = 80; dir.shadow.camera.top = 80; dir.shadow.camera.bottom = -80; dir.shadow.bias = -0.0005; scene.add(dir);
+  const dir = new THREE.DirectionalLight(0xaab0c0, 0.5); dir.position.set(40, 70, 25); dir.castShadow = !isMobile; dir.shadow.mapSize.set(2048, 2048); dir.shadow.camera.near = 1; dir.shadow.camera.far = 250; dir.shadow.camera.left = -80; dir.shadow.camera.right = 80; dir.shadow.camera.top = 80; dir.shadow.camera.bottom = -80; dir.shadow.bias = -0.0005; scene.add(dir);
 
   const player = { height: 1.65, speed: 3.0, runSpeed: 5.2, yaw: 0, pitch: 0, canMove: true, position: new THREE.Vector3(0, 1.65, 0), bob: 0, radius: 0.35, stepTimer: 0 };
   let mouseLocked = false;
@@ -648,12 +678,11 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     const W = 12, D = 10, H = 3.2;
     const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.2, D), MAT.floor); floor.position.y = -0.1; floor.receiveShadow = true; worldGroup.add(floor);
     const ceil = new THREE.Mesh(new THREE.BoxGeometry(W, 0.2, D), new THREE.MeshStandardMaterial({ map: rep(TEX.beton, 3, 3), color: 0x888888, roughness: 1.0 })); ceil.position.y = H; worldGroup.add(ceil);
-    function wall(x,z,w,d) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, d), MAT.wall); m.position.set(x, H/2, z); m.castShadow = true; m.receiveShadow = true; worldGroup.add(m); return m; }
+    function wall(x,z,w,d) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, H, d), MAT.wall); m.position.set(x, H/2, z); m.castShadow = !isMobile; m.receiveShadow = true; worldGroup.add(m); return m; }
     wall(0, -D/2, W, 0.3); wall(0,  D/2, W, 0.3); wall(-W/2, 0, 0.3, D); wall(W/2, 0, 0.3, D);
     const plinthMat = new THREE.MeshStandardMaterial({ color: 0x1a1008, roughness: 0.9 });
     for (const [x,z,w,d] of [[0,-D/2+0.2,W,0.08],[0,D/2-0.2,W,0.08],[-W/2+0.2,0,0.08,D],[W/2-0.2,0,0.08,D]]) { const p = new THREE.Mesh(new THREE.BoxGeometry(w, 0.15, d), plinthMat); p.position.set(x, 0.08, z); worldGroup.add(p); }
     
-    // ОКНО
     const loader = new THREE.TextureLoader();
     const winTex = createWindowFallback();
     const winView = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), new THREE.MeshBasicMaterial({ map: winTex }));
@@ -667,7 +696,6 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
       winView.material.needsUpdate = true;
     });
 
-    // Рамка
     const frameMat = MAT.woodDark;
     const fh = 1.7, fd = 2.7;
     const t = 0.08;
@@ -679,10 +707,9 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     let fRight = new THREE.Mesh(new THREE.BoxGeometry(t, fh, t), frameMat); fRight.position.set(fx, 1.8, -1.2 + fd/2); worldGroup.add(fRight);
     let fMid = new THREE.Mesh(new THREE.BoxGeometry(t, fh, t), frameMat); fMid.position.set(fx, 1.8, -1.2); worldGroup.add(fMid);
     
-    // ТРЕЩИНА (Плоская, рваная, с красным свечением)
     const crackMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.8), new THREE.MeshBasicMaterial({ map: texCrack(), transparent: true, depthWrite: false }));
     crackMesh.position.set(0, 1.4, -D/2 + 0.16);
-    crackMesh.scale.set(0.01, 0.01, 0.01); // Начинается с крошечной точки
+    crackMesh.scale.set(0.01, 0.01, 0.01); 
     worldGroup.add(crackMesh);
     window._crackMesh = crackMesh;
 
@@ -693,27 +720,26 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     
     const crackHit = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.2, 0.5), new THREE.MeshBasicMaterial({ visible:false })); crackHit.position.set(0, 1.2, -D/2 + 0.3); crackHit.userData = { type:'crack', label:'Осмотреть трещину' }; worldGroup.add(crackHit); interactables.push(crackHit);
     
-    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1.2), MAT.wood); tableTop.position.set(3, 0.8, 2.4); tableTop.castShadow = true; tableTop.receiveShadow = true; worldGroup.add(tableTop);
-    for (const dx of [-0.85,0.85]) for (const dz of [-0.5,0.5]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.8,0.1), MAT.wood); leg.position.set(3+dx, 0.4, 2.4+dz); leg.castShadow = true; worldGroup.add(leg); }
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 1.2), MAT.wood); tableTop.position.set(3, 0.8, 2.4); tableTop.castShadow = !isMobile; tableTop.receiveShadow = true; worldGroup.add(tableTop);
+    for (const dx of [-0.85,0.85]) for (const dz of [-0.5,0.5]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.8,0.1), MAT.wood); leg.position.set(3+dx, 0.4, 2.4+dz); leg.castShadow = !isMobile; worldGroup.add(leg); }
     addCollider(tableTop, 0.15);
-    const bedBase = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.4,3), MAT.woodDark); bedBase.position.set(-4, 0.2, 2); bedBase.castShadow = true; bedBase.receiveShadow = true; worldGroup.add(bedBase);
-    const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.0,0.28,2.8), MAT.fabric); mattress.position.set(-4, 0.56, 2); mattress.castShadow = true; worldGroup.add(mattress);
-    const blanket = new THREE.Mesh(new THREE.BoxGeometry(2.05,0.08,1.8), new THREE.MeshStandardMaterial({ color:0x5a4a3a, roughness:0.95 })); blanket.position.set(-4, 0.72, 2.4); blanket.castShadow = true; worldGroup.add(blanket);
-    const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.16,0.6), new THREE.MeshStandardMaterial({ color:0x7a7a80, roughness:0.95 })); pillow.position.set(-4, 0.78, 1.3); pillow.castShadow = true; worldGroup.add(pillow);
+    const bedBase = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.4,3), MAT.woodDark); bedBase.position.set(-4, 0.2, 2); bedBase.castShadow = !isMobile; bedBase.receiveShadow = true; worldGroup.add(bedBase);
+    const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.0,0.28,2.8), MAT.fabric); mattress.position.set(-4, 0.56, 2); mattress.castShadow = !isMobile; worldGroup.add(mattress);
+    const blanket = new THREE.Mesh(new THREE.BoxGeometry(2.05,0.08,1.8), new THREE.MeshStandardMaterial({ color:0x5a4a3a, roughness:0.95 })); blanket.position.set(-4, 0.72, 2.4); blanket.castShadow = !isMobile; worldGroup.add(blanket);
+    const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.16,0.6), new THREE.MeshStandardMaterial({ color:0x7a7a80, roughness:0.95 })); pillow.position.set(-4, 0.78, 1.3); pillow.castShadow = !isMobile; worldGroup.add(pillow);
     addCollider(bedBase, 0.1);
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.12,1), new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.4, metalness:0.4 })); counter.position.set(-3, 0.96, -D/2+0.9); counter.castShadow = true; counter.receiveShadow = true; worldGroup.add(counter);
-    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.85,0.95), MAT.wood); cabinet.position.set(-3, 0.47, -D/2+0.92); cabinet.castShadow = true; worldGroup.add(cabinet); addCollider(cabinet, 0.05);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.12,1), new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.4, metalness:0.4 })); counter.position.set(-3, 0.96, -D/2+0.9); counter.castShadow = !isMobile; counter.receiveShadow = true; worldGroup.add(counter);
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.85,0.95), MAT.wood); cabinet.position.set(-3, 0.47, -D/2+0.92); cabinet.castShadow = !isMobile; worldGroup.add(cabinet); addCollider(cabinet, 0.05);
     const sink = new THREE.Mesh(new THREE.BoxGeometry(0.95,0.18,0.55), MAT.metal); sink.position.set(-4.2, 1.06, -D/2+0.95); worldGroup.add(sink);
     const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.3,8), MAT.chrome); tap.position.set(-4.2, 1.3, -D/2+0.75); tap.rotation.z = 0.2; worldGroup.add(tap);
     const sinkHit = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.9,0.9), new THREE.MeshBasicMaterial({ visible:false })); sinkHit.position.set(-4.2, 1.0, -D/2+0.95); sinkHit.userData = { type:'sink', label:'Помыть руки' }; worldGroup.add(sinkHit); interactables.push(sinkHit);
     const bedHit = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.9,3.2), new THREE.MeshBasicMaterial({ visible:false })); bedHit.position.set(-4, 0.45, 2); bedHit.userData = { type:'bed', label:'Лечь на кровать' }; worldGroup.add(bedHit); interactables.push(bedHit);
     
-    // ДВЕРЬ
     const doorPivot = new THREE.Group();
     doorPivot.position.set(W/2-0.15, 0, 2.5);
     const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1,2.2,1.1), MAT.wood); 
     doorMesh.position.set(0, 1.1, -0.55); 
-    doorMesh.castShadow = true;
+    doorMesh.castShadow = !isMobile;
     doorPivot.add(doorMesh);
     const handle = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), MAT.chrome); 
     handle.position.set(-0.05, 1.0, -1.0); 
@@ -724,17 +750,17 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     const doorHit = new THREE.Mesh(new THREE.BoxGeometry(1.3,2.4,0.4), new THREE.MeshBasicMaterial({ visible:false })); doorHit.position.set(W/2-0.15, 1.1, 2.5); doorHit.userData = { type:'door', label:'Осмотреть дверь' }; worldGroup.add(doorHit); interactables.push(doorHit);
     
     const balcDoor = new THREE.Mesh(new THREE.BoxGeometry(0.1,2.2,1.2), MAT.glass); balcDoor.position.set(W/2-0.12, 1.1, -1.2); worldGroup.add(balcDoor);
-    const tvBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.95,0.18), new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:0.5, metalness:0.3 })); tvBody.position.set(3, 1.65, -D/2+0.5); tvBody.castShadow = true; worldGroup.add(tvBody);
+    const tvBody = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.95,0.18), new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:0.5, metalness:0.3 })); tvBody.position.set(3, 1.65, -D/2+0.5); tvBody.castShadow = !isMobile; worldGroup.add(tvBody);
     const tvScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.75), MAT.tvScreen); tvScreen.position.set(3, 1.65, -D/2+0.41); worldGroup.add(tvScreen);
     for (const a of [-0.3, 0.3]) { const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.5,5), MAT.chrome); ant.position.set(3+a, 2.3, -D/2+0.5); ant.rotation.z = a; worldGroup.add(ant); }
-    const tvStand = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,0.7), MAT.wood); tvStand.position.set(3, 0.25, -D/2+0.55); tvStand.castShadow = true; worldGroup.add(tvStand); addCollider(tvStand, 0.1);
+    const tvStand = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,0.7), MAT.wood); tvStand.position.set(3, 0.25, -D/2+0.55); tvStand.castShadow = !isMobile; worldGroup.add(tvStand); addCollider(tvStand, 0.1);
     const tvHit = new THREE.Mesh(new THREE.BoxGeometry(1.9,1.3,0.7), new THREE.MeshBasicMaterial({ visible:false })); tvHit.position.set(3, 1.5, -D/2+0.55); tvHit.userData = { type:'tv', label:'Посмотреть новости' }; worldGroup.add(tvHit); interactables.push(tvHit);
-    const wardrobe = new THREE.Mesh(new THREE.BoxGeometry(1.6,2.4,0.6), MAT.woodDark); wardrobe.position.set(-W/2+0.9, 1.2, -2); wardrobe.castShadow = true; worldGroup.add(wardrobe); addCollider(wardrobe, 0.05);
+    const wardrobe = new THREE.Mesh(new THREE.BoxGeometry(1.6,2.4,0.6), MAT.woodDark); wardrobe.position.set(-W/2+0.9, 1.2, -2); wardrobe.castShadow = !isMobile; worldGroup.add(wardrobe); addCollider(wardrobe, 0.05);
     const carpet = new THREE.Mesh(new THREE.PlaneGeometry(3,4), new THREE.MeshStandardMaterial({ color:0x4a2a2a, roughness:1 })); carpet.rotation.x = -Math.PI/2; carpet.position.set(0, 0.005, 0); carpet.receiveShadow = true; worldGroup.add(carpet);
     const lampCord = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.4,6), MAT.metalDark); lampCord.position.set(0, H-0.2, 0); worldGroup.add(lampCord);
     const lampShade = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.3,16, 1, true), new THREE.MeshStandardMaterial({ color:0x333333, roughness:0.6, side:THREE.DoubleSide })); lampShade.position.set(0, H-0.45, 0); worldGroup.add(lampShade);
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color:0xffddaa })); bulb.position.set(0, H-0.5, 0); worldGroup.add(bulb);
-    const mainLight = new THREE.PointLight(0xffddaa, 1.2, 14, 1.5); mainLight.position.set(0, H-0.5, 0); mainLight.castShadow = true; mainLight.shadow.mapSize.set(1024,1024); mainLight.shadow.bias = -0.002; worldGroup.add(mainLight);
+    const mainLight = new THREE.PointLight(0xffddaa, 1.2, 14, 1.5); mainLight.position.set(0, H-0.5, 0); mainLight.castShadow = !isMobile; mainLight.shadow.mapSize.set(1024,1024); mainLight.shadow.bias = -0.002; worldGroup.add(mainLight);
     const kLight = new THREE.PointLight(0xffe8cc, 0.7, 9, 1.4); kLight.position.set(-3, 2.7, -3); worldGroup.add(kLight);
     const cornerLight = new THREE.PointLight(0xff8844, 0.5, 7, 1.5); cornerLight.position.set(4, 2, 3); worldGroup.add(cornerLight);
     player.position.set(2, player.height, 4); player.yaw = Math.PI * 0.75; player.pitch = -0.05; player.bob = 0;
@@ -744,30 +770,32 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     const car = new THREE.Group();
     const carMat = new THREE.MeshStandardMaterial({ map: getCarTex(color), roughness: 0.45, metalness: 0.4 });
     const carMatPlain = new THREE.MeshStandardMaterial({ color: color, roughness: 0.45, metalness: 0.4 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 4.2), carMat); body.position.set(0, 0.45, 0); body.castShadow = true; body.receiveShadow = true; car.add(body);
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.55, 2.2), carMatPlain); cabin.position.set(0, 0.98, -0.1); cabin.castShadow = true; car.add(cabin);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 4.2), carMat); body.position.set(0, 0.45, 0); body.castShadow = !isMobile; body.receiveShadow = true; car.add(body);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.55, 2.2), carMatPlain); cabin.position.set(0, 0.98, -0.1); cabin.castShadow = !isMobile; car.add(cabin);
     const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.4, 0.05), MAT.glassDark); windshield.position.set(0, 0.98, -1.15); windshield.rotation.x = 0.15; car.add(windshield);
     const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.4, 0.05), MAT.glassDark); rearGlass.position.set(0, 0.98, 0.95); rearGlass.rotation.x = -0.15; car.add(rearGlass);
     for (const dx of [-0.88, 0.88]) { const sideGlass = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 2.0), MAT.glassDark); sideGlass.position.set(dx, 0.98, -0.1); car.add(sideGlass); }
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.08, 2.15), carMatPlain); roof.position.set(0, 1.27, -0.1); roof.castShadow = true; car.add(roof);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.08, 2.15), carMatPlain); roof.position.set(0, 1.27, -0.1); roof.castShadow = !isMobile; car.add(roof);
     for (const dx of [-0.6, 0.6]) { const hl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.08), MAT.headlight); hl.position.set(dx, 0.55, -2.12); car.add(hl); const hlLight = new THREE.PointLight(0xffeecc, 0.3, 4, 2); hlLight.position.set(dx, 0.55, -2.3); car.add(hlLight); }
     for (const dx of [-0.65, 0.65]) { const tl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.08), MAT.taillight); tl.position.set(dx, 0.55, 2.12); car.add(tl); }
     const plateF = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.02), MAT.plate); plateF.position.set(0, 0.35, -2.13); car.add(plateF);
     const plateR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.02), MAT.plate); plateR.position.set(0, 0.35, 2.13); car.add(plateR);
     const bmpF = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.15, 0.1), MAT.chrome); bmpF.position.set(0, 0.28, -2.15); car.add(bmpF);
     const bmpR = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.15, 0.1), MAT.chrome); bmpR.position.set(0, 0.28, 2.15); car.add(bmpR);
-    for (const dx of [-0.9, 0.9]) for (const dz of [-1.4, 1.4]) { const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 16), MAT.tire); wheel.rotation.z = Math.PI/2; wheel.position.set(dx, 0.34, dz); wheel.castShadow = true; car.add(wheel); const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.26, 12), MAT.chrome); disc.rotation.z = Math.PI/2; disc.position.set(dx, 0.34, dz); car.add(disc); }
+    for (const dx of [-0.9, 0.9]) for (const dz of [-1.4, 1.4]) { const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 16), MAT.tire); wheel.rotation.z = Math.PI/2; wheel.position.set(dx, 0.34, dz); wheel.castShadow = !isMobile; car.add(wheel); const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.26, 12), MAT.chrome); disc.rotation.z = Math.PI/2; disc.position.set(dx, 0.34, dz); car.add(disc); }
     car.position.set(x, 0, z); car.rotation.y = rotation; worldGroup.add(car);
     const box = new THREE.Box3().setFromObject(car); box.min.x -= 0.1; box.min.z -= 0.1; box.max.x += 0.1; box.max.z += 0.1; colliders.push(box); return car;
   }
 
   function buildCity() {
     clearWorld(); scene.fog = new THREE.FogExp2(0x6b6b6b, 0.014); scene.background = new THREE.Color(0x6b6b6b); dir.intensity = 0.55; hemi.intensity = 0.6;
+    if (isMobile) { renderer.shadowMap.enabled = false; }
+    
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), MAT.asphalt); ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; worldGroup.add(ground);
     const buildingColors = [0x4a4a4a, 0x3a3a3a, 0x5a5a4a, 0x4a3a3a, 0x3a4a4a, 0x50504a];
     const buildingBoxes = [];
     function createBuilding(x, z, w, d, h, color) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: rep(TEX.brick, Math.max(2, w/6), Math.max(2, h/6)), color: color, roughness: 0.9 })); b.position.set(x, h/2, z); b.castShadow = true; b.receiveShadow = true; worldGroup.add(b);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ map: rep(TEX.brick, Math.max(2, w/6), Math.max(2, h/6)), color: color, roughness: 0.9 })); b.position.set(x, h/2, z); b.castShadow = !isMobile; b.receiveShadow = true; worldGroup.add(b);
       const box = new THREE.Box3().setFromObject(b); colliders.push(box); buildingBoxes.push({ x, z, w, d });
       const winMat = new THREE.MeshStandardMaterial({ color: 0x0d0d10, emissive: 0x0d0d10, emissiveIntensity: 0.15, roughness: 0.4 });
       const litMat = new THREE.MeshStandardMaterial({ color: 0xffdd88, emissive: 0xffaa44, emissiveIntensity: 0.9 });
@@ -776,15 +804,15 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
       for (const s of sides) { const cols = Math.floor(s.width/2.6); for (let r = 0; r < rows; r++) { for (let c = 0; c < cols; c++) { if (Math.random() > 0.42) { const lit = Math.random() > 0.75; const win = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.5), lit ? litMat : winMat); const off = -s.width/2 + 1.4 + c*2.6; if (s.normal === 'z') { win.position.set(x + off, 2.2 + r*3, z + s.sign*(d/2 + 0.02)); win.rotation.y = s.sign > 0 ? 0 : Math.PI; } else { win.position.set(x + s.sign*(w/2 + 0.02), 2.2 + r*3, z + off); win.rotation.y = s.sign > 0 ? Math.PI/2 : -Math.PI/2; } worldGroup.add(win); } } } }
     }
     for (let bx = -140; bx <= 140; bx += 48) { for (let bz = -140; bz <= 140; bz += 48) { if (Math.abs(bx) < 30 && Math.abs(bz) < 30) continue; const w = 14 + Math.random()*10; const d = 14 + Math.random()*10; const h = 16 + Math.random()*32; createBuilding(bx + (Math.random()-0.5)*8, bz + (Math.random()-0.5)*8, w, d, h, buildingColors[(Math.random()*buildingColors.length)|0]); } }
-    const factory = new THREE.Mesh(new THREE.BoxGeometry(44, 26, 32), new THREE.MeshStandardMaterial({ map: rep(TEX.brick, 6, 4), color: 0x2a2018, roughness: 0.95 })); factory.position.set(-85, 13, -85); factory.castShadow = true; worldGroup.add(factory); colliders.push(new THREE.Box3().setFromObject(factory));
-    for (let i = 0; i < 4; i++) { const pipe = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.0, 16, 10), MAT.rust); pipe.position.set(-100 + i*9, 34, -88 + i*5); pipe.castShadow = true; worldGroup.add(pipe); }
+    const factory = new THREE.Mesh(new THREE.BoxGeometry(44, 26, 32), new THREE.MeshStandardMaterial({ map: rep(TEX.brick, 6, 4), color: 0x2a2018, roughness: 0.95 })); factory.position.set(-85, 13, -85); factory.castShadow = !isMobile; worldGroup.add(factory); colliders.push(new THREE.Box3().setFromObject(factory));
+    for (let i = 0; i < 4; i++) { const pipe = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.0, 16, 10), MAT.rust); pipe.position.set(-100 + i*9, 34, -88 + i*5); pipe.castShadow = !isMobile; worldGroup.add(pipe); }
     const anomalyGlow = new THREE.PointLight(0xaa00aa, 2.5, 70, 1.5); anomalyGlow.position.set(-85, 32, -85); worldGroup.add(anomalyGlow);
-    for (let i = -3; i <= 3; i++) { for (let j = -3; j <= 3; j++) { if (Math.random() > 0.45) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 6.5, 8), MAT.metalDark); pole.position.set(i*40 + 16, 3.25, j*40 + 16); pole.castShadow = true; worldGroup.add(pole); const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.4), MAT.lamp); head.position.set(i*40 + 16, 6.4, j*40 + 16); worldGroup.add(head); const pl = new THREE.PointLight(0xffaa44, 0.55, 18, 1.6); pl.position.set(i*40 + 16, 6.1, j*40 + 16); worldGroup.add(pl); } } }
+    for (let i = -3; i <= 3; i++) { for (let j = -3; j <= 3; j++) { if (Math.random() > 0.45) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 6.5, 8), MAT.metalDark); pole.position.set(i*40 + 16, 3.25, j*40 + 16); pole.castShadow = !isMobile; worldGroup.add(pole); const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.4), MAT.lamp); head.position.set(i*40 + 16, 6.4, j*40 + 16); worldGroup.add(head); const pl = new THREE.PointLight(0xffaa44, 0.55, 18, 1.6); pl.position.set(i*40 + 16, 6.1, j*40 + 16); worldGroup.add(pl); } } }
     function isFarFromBuildings(x, z, radius=8) { for (const b of buildingBoxes) { const dx = Math.max(Math.abs(x - b.x) - b.w/2, 0); const dz = Math.max(Math.abs(z - b.z) - b.d/2, 0); if (Math.sqrt(dx*dx + dz*dz) < radius) return false; } return true; }
     let stopX = 60, stopZ = 10;
     for (let attempt = 0; attempt < 200; attempt++) { const tx = (Math.random() - 0.5) * 180; const tz = (Math.random() - 0.5) * 180; if (isFarFromBuildings(tx, tz, 6) && Math.abs(tx) > 25 && Math.abs(tz) > 25) { stopX = tx; stopZ = tz; break; } }
     const bs = new THREE.Group();
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 2.2), MAT.rust); roof.position.set(0, 2.6, 0); roof.castShadow = true; bs.add(roof);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 2.2), MAT.rust); roof.position.set(0, 2.6, 0); roof.castShadow = !isMobile; bs.add(roof);
     for (const dx of [-2, 2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.6, 8), MAT.rust); post.position.set(dx, 1.3, 0); bs.add(post); }
     const benchSeat = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 0.5), MAT.wood); benchSeat.position.set(0, 0.55, 0.6); bs.add(benchSeat);
     const benchBack = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.5, 0.1), MAT.wood); benchBack.position.set(0, 0.85, 0.85); bs.add(benchBack);
@@ -792,7 +820,8 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     bs.position.set(stopX, 0, stopZ); worldGroup.add(bs);
     const stopHit = new THREE.Mesh(new THREE.BoxGeometry(5,3,4), new THREE.MeshBasicMaterial({ visible:false })); stopHit.position.set(stopX, 1.5, stopZ); stopHit.userData = { type:'busstop', label:'Дойти до остановки' }; worldGroup.add(stopHit); interactables.push(stopHit); window._stopPos = new THREE.Vector3(stopX, 0, stopZ);
     const carColors = [0x553333, 0x333355, 0x335533, 0x555533, 0x663344, 0x444466, 0x884433, 0x334466];
-    for (let i = 0; i < 20; i++) { const x = (Math.random()-0.5)*220; const z = (Math.random()-0.5)*220; if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; if (Math.hypot(x - stopX, z - stopZ) < 8) continue; createCar(x, z, carColors[(Math.random()*carColors.length)|0], Math.random()*Math.PI*2); }
+    const carCount = isMobile ? 8 : 20;
+    for (let i = 0; i < carCount; i++) { const x = (Math.random()-0.5)*220; const z = (Math.random()-0.5)*220; if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; if (Math.hypot(x - stopX, z - stopZ) < 8) continue; createCar(x, z, carColors[(Math.random()*carColors.length)|0], Math.random()*Math.PI*2); }
     player.position.set(10, player.height, 10); player.yaw = Math.PI * 0.25; player.pitch = 0; player.bob = 0;
   }
 
@@ -801,7 +830,7 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), MAT.grass); ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; worldGroup.add(ground);
     const trench = new THREE.Mesh(new THREE.BoxGeometry(7, 0.6, 9), new THREE.MeshStandardMaterial({ map: rep(TEX.betonDark, 3, 3), color: 0x2a2010, roughness: 1 })); trench.position.set(0, -0.3, 0); worldGroup.add(trench);
     const blood = new THREE.Mesh(new THREE.CircleGeometry(1.3, 20), MAT.blood); blood.rotation.x = -Math.PI/2; blood.position.set(1, 0.02, 2); worldGroup.add(blood);
-    for (let i = 0; i < 50; i++) { const x = (Math.random()-0.5)*90; const z = (Math.random()-0.5)*90; if (Math.abs(x) < 5 && Math.abs(z) < 6) continue; const h = 4 + Math.random()*4; const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.28, h, 6), new THREE.MeshStandardMaterial({ color: 0x1a1008, roughness: 1 })); trunk.position.set(x, h/2, z); trunk.castShadow = true; worldGroup.add(trunk); colliders.push(new THREE.Box3(new THREE.Vector3(x-0.3, 0, z-0.3), new THREE.Vector3(x+0.3, h, z+0.3))); for (let k = 0; k < 3; k++) { const foliage = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random()*0.8, 2.2 + Math.random()*1.5, 6), new THREE.MeshStandardMaterial({ color: 0x0a1406, roughness: 1 })); foliage.position.set(x, h + k*0.8 - 0.3, z); foliage.castShadow = true; worldGroup.add(foliage); } }
+    for (let i = 0; i < 50; i++) { const x = (Math.random()-0.5)*90; const z = (Math.random()-0.5)*90; if (Math.abs(x) < 5 && Math.abs(z) < 6) continue; const h = 4 + Math.random()*4; const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.28, h, 6), new THREE.MeshStandardMaterial({ color: 0x1a1008, roughness: 1 })); trunk.position.set(x, h/2, z); trunk.castShadow = !isMobile; worldGroup.add(trunk); colliders.push(new THREE.Box3(new THREE.Vector3(x-0.3, 0, z-0.3), new THREE.Vector3(x+0.3, h, z+0.3))); for (let k = 0; k < 3; k++) { const foliage = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random()*0.8, 2.2 + Math.random()*1.5, 6), new THREE.MeshStandardMaterial({ color: 0x0a1406, roughness: 1 })); foliage.position.set(x, h + k*0.8 - 0.3, z); foliage.castShadow = !isMobile; worldGroup.add(foliage); } }
     const moon = new THREE.PointLight(0x4466aa, 0.4, 40, 1.5); moon.position.set(0, 15, 0); worldGroup.add(moon);
     const bs = new THREE.Group(); const roof = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.12, 2.2), MAT.rust); roof.position.set(0, 2.6, 0); bs.add(roof); for (const dx of [-2, 2]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,2.6,8), MAT.rust); post.position.set(dx, 1.3, 0); bs.add(post); } const benchSeat = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 0.5), MAT.wood); benchSeat.position.set(0, 0.55, 0.6); bs.add(benchSeat); bs.position.set(0, 0, -30); worldGroup.add(bs);
     const escapeHit = new THREE.Mesh(new THREE.BoxGeometry(5,3,4), new THREE.MeshBasicMaterial({ visible:false })); escapeHit.position.set(0, 1.5, -30); escapeHit.userData = { type:'escape', label:'Дойти до остановки' }; worldGroup.add(escapeHit); interactables.push(escapeHit);
@@ -826,7 +855,19 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
       case 'sink':
         if (flags.foundBlood && !flags.washedHand) { showSubtitle("Ты трёшь руку тряпкой. Потом водой. Но красное не смывается — оно въелось в кожу, будто кровь проступает изнутри."); flags.washedHand = true; handIsRed = true; hasCloth = true; updateInventoryUI(); buildViewmodel(); currentObjective = "Посмотреть новости по телевизору"; updateHUD(); setTimeout(() => { showSubtitle("По телевизору — экстренные новости: «...полностью красный человек убил двоих на улице Ленина. Началась эвакуация...» За окном грохот — столб упал на трамвай."); flags.heardNews = true; currentObjective = "Запереть дверь и не впускать никого"; updateHUD(); }, 4500); } else if (handIsRed) showSubtitle("Красное не смывается. Вода стекает красными каплями."); else showSubtitle("Ты умываешься. Обычная вода."); break;
       case 'tv':
-        if (flags.foundBlood && !flags.heardNews) { showSubtitle("Новости: «...после взрыва на заводе фиксируются аномалии. Жителей просят не выходить. Полностью красный человек убил двоих...»"); flags.heardNews = true; currentObjective = "Запереть дверь и не впускать никого"; updateHUD(); hasGloves = true; updateInventoryUI(); } else if (!flags.foundBlood) showSubtitle("Обычные новости. Но бегущая строка внизу: «Аномальная зона расширяется»."); break;
+        window._videoOverlay.style.display = 'flex';
+        window._newsVideo.currentTime = 0;
+        window._newsVideo.play().catch(e => console.log('Ошибка видео:', e));
+        gameState = STATE.TV;
+        document.exitPointerLock();
+        window.onVideoEnd = () => {
+            flags.heardNews = true; 
+            currentObjective = "Запереть дверь и не впускать никого"; 
+            updateHUD(); hasGloves = true; updateInventoryUI();
+            gameState = STATE.APARTMENT;
+            canvas.requestPointerLock();
+        };
+        break;
       case 'door':
         if (flags.heardNews && !flags.lockedDoor) { 
             showSubtitle("Ты запираешь дверь на все замки. Закрываешь балкон. Через минуту — стук. «Сосед! Мистер Гнида! Помоги лампочку починить!»"); 
@@ -845,12 +886,7 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
         } else if (flags.lockedDoor) showSubtitle("Дверь заперта. Стук прекратился."); else showSubtitle("Обычная дверь. Пока что."); break;
       case 'busstop': if (gameState === STATE.ESCAPE) { gameState = STATE.FOREST; buildForest(); showSubtitle("Ты добираешься до остановки. Но чувствуешь слабость... Ты спускаешься в канаву и теряешь сознание."); currentObjective = "Дойти до остановки в лесу"; updateHUD(); } break;
       case 'escape': if (gameState === STATE.FOREST) triggerEnding(); break;
-      case 'escapeTrench': flags.wentIntoTrench = true; gameState = STATE.ESCAPE; document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); setTimeout(() => { camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); }, 500); camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
-      camera.position.set(10, 1.65, 10);
-      camera.rotation.y = Math.PI * 0.25;
-      camera.rotation.x = 0;
-      renderer.render(scene, camera); document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); setTimeout(() => { camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); }, 500);
-      setTimeout(() => { renderer.render(scene, camera); }, 100); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
+      case 'escapeTrench': flags.wentIntoTrench = true; gameState = STATE.ESCAPE; document.getElementById('flash').style.opacity = '0.8'; setTimeout(() => { document.getElementById('flash').style.opacity = '0'; buildCity(); setTimeout(() => { camera.position.set(10, 1.65, 10); camera.rotation.y = Math.PI * 0.25; camera.rotation.x = 0; renderer.render(scene, camera); }, 500); showSubtitle("Ты просыпаешься в грязи, смешанной с кровью. Вдалеке виднеется остановка. Нужно идти."); currentObjective = "Дойти до остановки автобуса"; updateHUD(); }, 1000); break;
     }
   };
 
@@ -875,9 +911,6 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
     document.getElementById('fade').style.opacity = '1';
     setTimeout(() => {
       document.getElementById('act1-ui').style.display = 'none';
-      document.getElementById('hud').style.display = 'none';
-      document.getElementById('subtitle').style.display = 'none';
-      document.getElementById('minimap-container').style.display = 'none';
       document.getElementById('c-act1').style.display = 'none';
       document.getElementById('fade').style.opacity = '0';
       act1Active = false;
@@ -920,7 +953,7 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
 
   const clock = new THREE.Clock();
   function updatePlayer(dt) {
-    if (!act1Active || !player.canMove || gameState === STATE.MENU || gameState === STATE.ENDING) return;
+    if (!act1Active || !player.canMove || gameState === STATE.MENU || gameState === STATE.ENDING || gameState === STATE.TV) return;
     const running = globalKeys['ShiftLeft'] || globalKeys['ShiftRight']; const speed = running ? player.runSpeed : player.speed;
     const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); const right = new THREE.Vector3( Math.cos(player.yaw), 0, -Math.sin(player.yaw));
     const move = new THREE.Vector3();
@@ -947,19 +980,19 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
   }
 
   function updateInteractables() {
-    if (!act1Active || gameState === STATE.MENU || gameState === STATE.ENDING) return;
+    if (!act1Active || gameState === STATE.MENU || gameState === STATE.ENDING || gameState === STATE.TV) return;
     raycaster.setFromCamera(new THREE.Vector2(0,0), camera); const meshes = interactables.filter(o => o.parent); const hits = raycaster.intersectObjects(meshes, false); const cross = document.getElementById('crosshair-act1');
     if (hits.length && hits[0].distance < 4.5) { const obj = hits[0].object; if (currentInteractable !== obj) { currentInteractable = obj; cross.classList.add('active'); showSubtitle('[E] ' + (obj.userData.label || 'Взаимодействовать')); } } else { if (currentInteractable) { currentInteractable = null; cross.classList.remove('active'); } }
   }
 
   function updateHallucinations(dt) {
-    if (!act1Active || !anomaliesStarted) return; hallucinationTimer += dt; const flash = document.getElementById('flash');
+    if (!act1Active || !anomaliesStarted || gameState === STATE.TV) return; hallucinationTimer += dt; const flash = document.getElementById('flash');
     if (Math.random() < dt * 0.6) { flash.style.opacity = (Math.random() * 0.18).toString(); setTimeout(() => flash.style.opacity = '0', 90); }
     if (hallucinationTimer > 4 && Math.random() < dt * 2.5) { player.pitch += (Math.random()-0.5) * 0.012; }
   }
 
   function updateEvents(dt) {
-    if (!act1Active) return;
+    if (!act1Active || gameState === STATE.TV) return;
     
     if (gameState === STATE.APARTMENT && window._crackMesh && window._crackMesh.scale.x < 1) {
       crackGrowth += dt * 0.2; 
@@ -1015,9 +1048,6 @@ startBtn.addEventListener('touchstart', startHandler, {passive: false});
 // ============================================================
 function startAct2() {
   document.getElementById('act1-ui').style.display = 'none';
-      document.getElementById('hud').style.display = 'none';
-      document.getElementById('subtitle').style.display = 'none';
-      document.getElementById('minimap-container').style.display = 'none';
   document.getElementById('c-act1').style.display = 'none';
   document.getElementById('mobileControls').style.display = 'block';
   
