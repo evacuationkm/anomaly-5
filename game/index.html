@@ -676,7 +676,8 @@ window._newsVideo.addEventListener('ended', () => {
     camera.add(viewmodelGroup);
   }
 
-  const worldGroup = new THREE.Group(); scene.add(worldGroup);
+  const worldGroup = new THREE.Group();
+  window.worldGroup = worldGroup; scene.add(worldGroup);
   function clearWorld() {
     while (worldGroup.children.length) {
       const c = worldGroup.children[0];
@@ -1793,5 +1794,6 @@ function initAct2Game() {
 
 <div id="videoOverlay2" style="display:none; position:absolute; inset:0; z-index:35; background:#000; align-items:center; justify-content:center; flex-direction:column;"><video id="newsVideo2" playsinline loop src="../news.mp4" style="width:100%; height:100%; object-fit:contain;"></video><audio id="newsAudio2" src="../news2.mp3" loop preload="auto"></audio><div id="newsBreaking2" style="position:absolute; bottom:80px; left:60px; right:60px; font-family:monospace; font-size:20px; line-height:1.7; color:#e8e8e8; background:linear-gradient(180deg,rgba(0,0,0,0.55),rgba(20,0,0,0.75)); padding:18px 26px; border-left:4px solid #c00; border-right:4px solid #c00; border-radius:3px; white-space:pre-wrap; min-height:200px; z-index:36;"><span style="color:#f33; font-weight:bold;">[ЭКСТРЕННЫЙ ВЫПУСК]</span><br><br><span id="news2Text"></span><span style="color:#f33;">▌</span></div><button id="skipVideoBtn2" style="position:absolute; bottom:30px; right:30px; background:rgba(20,0,0,0.8); color:#ccc; border:1px solid #555; padding:10px 24px; cursor:pointer; z-index:36;">ПРОПУСТИТЬ >></button></div>
 <script src="news2.js"></script>
+<script src="window_video.js"></script>
 </body>
 </html>
