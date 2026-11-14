@@ -101,6 +101,7 @@
 </head>
 <body>
 
+<audio id="rainAudio" src="rain.mp3" loop preload="auto"></audio>
 <audio id="cassetteAudio" src="instructions.wav" preload="auto"></audio>
 <audio id="cassetteAudio2" src="instructions_2.wav" preload="auto"></audio>
 <audio id="cassetteAudio3" src="instructions_3.wav" preload="auto"></audio>
@@ -386,6 +387,8 @@ const startBtn = document.getElementById('start-btn');
 const startHandler = (e) => {
   if (e && e.cancelable) e.preventDefault();
   initAudio();
+  const rain = document.getElementById('rainAudio');
+  if (rain) { rain.volume = 0.4; rain.play().catch(()=>{}); }
   if (window.startGameAct1) window.startGameAct1();
 };
 startBtn.addEventListener('click', startHandler);
@@ -1068,7 +1071,9 @@ window._newsVideo.addEventListener('ended', () => {
         } else if (flags.lockedDoor) showSubtitle("Дверь заперта. Стук прекратился."); else showSubtitle("Обычная дверь. Пока что."); break;
       case 'busstop': if (gameState === STATE.ESCAPE) { gameState = STATE.FOREST; buildForest(); showSubtitle("Ты добираешься до остановки. Но чувствуешь слабость... Ты спускаешься в канаву и теряешь сознание."); currentObjective = "Дойти до остановки в лесу"; updateHUD(); } break;
       case 'escape': if (gameState === STATE.FOREST) triggerEnding(); break;
-      case 'escapeTrench': 
+      case 'escapeTrench':
+  const rainStop = document.getElementById('rainAudio');
+  if (rainStop) { rainStop.pause(); rainStop.currentTime = 0; } 
   flags.wentIntoTrench = true; 
   gameState = STATE.ESCAPE; 
   const fade = document.getElementById('fade');
