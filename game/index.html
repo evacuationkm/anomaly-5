@@ -1090,7 +1090,7 @@ window._newsVideo.addEventListener('ended', () => {
   function triggerHallucinationSequence() {
     flags.foundBlood = true; const flash = document.getElementById('flash'); flash.style.opacity = '0.7'; setTimeout(() => flash.style.opacity = '0', 300);
     player.position.set(0, player.height - 1.0, -2); player.pitch = -0.45;
-    showSubtitle("...Ты приходишь в себя на полу. Под тобой — лужа крови. Твоя рука... она полностью красная. Ты хватаешь тряпку и начинаешь оттирать пол.");
+    showSubtitle("...Ты приходишь в себя на полу. Под тобой — лужа крови. Твоя рука... она полностью красная. Ты хватаешь тряпку и начинаешь оттирать пол."); setTimeout(function() { if (window.startNews2) window.startNews2(); }, 3500);
     hasCloth = true; updateInventoryUI();
     const bloodFloor = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), MAT.blood); bloodFloor.rotation.x = -Math.PI/2; bloodFloor.position.set(0, 0.012, -2); worldGroup.add(bloodFloor);
     currentObjective = "Помыть пол и руки"; updateHUD();
@@ -1791,5 +1791,7 @@ function initAct2Game() {
 })();
 </script>
 
+<div id="videoOverlay2" style="display:none; position:absolute; inset:0; z-index:35; background:#000; align-items:center; justify-content:center; flex-direction:column;"><video id="newsVideo2" playsinline loop src="../news.mp4" style="width:100%; height:100%; object-fit:contain;"></video><audio id="newsAudio2" src="../news2.mp3" loop preload="auto"></audio><div id="newsBreaking2" style="position:absolute; bottom:80px; left:60px; right:60px; font-family:monospace; font-size:20px; line-height:1.7; color:#e8e8e8; background:linear-gradient(180deg,rgba(0,0,0,0.55),rgba(20,0,0,0.75)); padding:18px 26px; border-left:4px solid #c00; border-right:4px solid #c00; border-radius:3px; white-space:pre-wrap; min-height:200px; z-index:36;"><span style="color:#f33; font-weight:bold;">[ЭКСТРЕННЫЙ ВЫПУСК]</span><br><br><span id="news2Text"></span><span style="color:#f33;">▌</span></div><button id="skipVideoBtn2" style="position:absolute; bottom:30px; right:30px; background:rgba(20,0,0,0.8); color:#ccc; border:1px solid #555; padding:10px 24px; cursor:pointer; z-index:36;">ПРОПУСТИТЬ >></button></div>
+<script src="news2.js"></script>
 </body>
 </html>
